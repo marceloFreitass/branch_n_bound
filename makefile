@@ -10,11 +10,14 @@ CPPC = g++
 #############################
 
 #### opcoes de compilacao e includes
-CCOPT = $(BITS_OPTION) -O3 -fPIC -fexceptions -DNDEBUG -DIL_STD 
+CCOPT = $(BITS_OPTION) -fPIC -fexceptions -DIL_STD $(CFLAGS_MODE) 
 GUROBIINCDIR = $(GUROBI_DIR)/include/
 GUROBICPPLIB = -L$(GUROBI_DIR)/lib -lgurobi_c++ -lgurobi120
-CCFLAGS = -I$(GUROBIINCDIR) -MMD -Wall
+CCFLAGS = $(CCOPT) -I$(GUROBIINCDIR) -MMD -Wall
 #############################
+
+SRCS = $(wildcard $(SRCDIR)/*.cpp)
+OBJS = $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SRCS))
 
 #### flags do linker
 CCLNFLAGS = -L$(GUROBI_DIR)/lib -lgurobi_c++ -lgurobi120 -lm -lpthread -ldl 
@@ -24,6 +27,17 @@ CCLNFLAGS = -L$(GUROBI_DIR)/lib -lgurobi_c++ -lgurobi120 -lm -lpthread -ldl
 SRCDIR = src
 OBJDIR = obj
 #############################
+BUILD ?= release
+
+ifeq ($(BUILD),release)
+    CFLAGS_MODE = -O3 -DNDEBUG
+    OBJDIR = obj/release
+else ifeq ($(BUILD),debug)
+    CFLAGS_MODE = -g -DDEBUG
+    OBJDIR = obj/debug
+else
+    $(error Invalid BUILD mode '$(BUILD)'. Use 'debug' or 'release')
+endif
 
 #### lista de todos os srcs e todos os objs
 SRCS = $(wildcard $(SRCDIR)/*.cpp)
@@ -31,9 +45,7 @@ OBJS = $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SRCS))
 #############################
 
 #### regra principal, gera o executavel
-bc: 
-	$(MAKE) mkdirs
-	$(MAKE) $(OBJS) 
+bc: $(OBJS) 
 	@echo  "\033[31m \nLinking all objects files: \033[0m"
 	$(CPPC) $(BITS_OPTION) $(OBJS) -o $@ $(CCLNFLAGS)
 ############################
@@ -43,17 +55,23 @@ bc:
 
 #regra para cada arquivo objeto: compila e gera o arquivo de dependencias do arquivo objeto
 #cada arquivo objeto depende do .c e dos headers (informacao dos header esta no arquivo de dependencias gerado pelo compiler)
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp
-	@echo  "\033[31m \nCompiling $<: \033[0m"
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp | mkdirs
+	@echo  "\033[31m \nCompiling $< [$(BUILD) mode]: \033[0m"
 	$(CPPC) $(CCFLAGS) -c $< -o $@
 #delete objetos e arquivos de dependencia
 clean:
-	@echo "\033[31mcleaning obj directory \033[0m"
-	@rm bc -f $(OBJDIR)/*.o $(OBJDIR)/*.d
+	@echo "\033[31mCleaning all obj directories\033[0m"
+	@rm -f bc
+	@rm -rf obj/debug obj/release
 
 mkdirs:
-	mkdir -p obj
+	mkdir -p $(OBJDIR)
 	
 rebuild: 
 	$(MAKE) clean
 	$(MAKE) bc
+debug:
+	$(MAKE) BUILD=debug bc
+
+release:
+	$(MAKE) BUILD=release bc
