@@ -7,7 +7,7 @@
 using namespace std;
 
 void printSolution(GRBModel& model, int nCategories, int nFoods,
-                   GRBVar* buy, GRBVar* nutrition);
+                   GRBVar* buy);
 
 int main(int argc,
      char *argv[])
@@ -15,17 +15,15 @@ int main(int argc,
   GRBEnv* env = NULL;
   GRBVar* nutrition = NULL;
   GRBVar* buy = NULL;
+  int numVars;
   try
   {
 
-    // Nutrition guidelines, based on
-    // USDA Dietary Guidelines for Americans, 2005
-    // http://www.health.gov/DietaryGuidelines/dga2005/
     const int nCategories = 4;
     string Categories[] =
       { "calories", "protein", "fat", "sodium" };
     double minNutrition[] = { 1800, 91, 0, 0 };
-    double maxNutrition[] = { 2200, GRB_INFINITY, 65, 1779 };
+    double maxNutrition[] = { 2200, 1000, 65, 1779 };
 
     // Set of foods
     const int nFoods = 9;
@@ -52,27 +50,22 @@ int main(int argc,
     // env.set(GRB.IntParam.Method, 1);
     GRBModel model = GRBModel(*env);
     model.set(GRB_StringAttr_ModelName, "diet");
+    /* 0 - Primal Simplex
+       1 - Dual simplex
+    */
     model.set(GRB_IntParam_Method, 1);
+    /*
+    nao pode ser 0, se nao ele sempre descarta o Vbasis e Cbasis, provavelmente tem que usar LPWARMstart = 2
+    para ele rodar o presolve mesmo com a base inicial sendo enviada
+    */
+    model.set(GRB_IntParam_LPWarmStart, 1);
 
-    // Create decision variables for the nutrition information,
-    // which we limit via bounds
-    nutrition = model.addVars(minNutrition, maxNutrition, 0, 0,
-                              Categories, nCategories);
-
-    // Create decision variables for the foods to buy
-    //
-    // Note: For each decision variable we add the objective coefficient
-    //       with the creation of the variable.
     buy = model.addVars(0, 0, cost, 0, x.data(), nFoods);
-
-    // The objective is to minimize the costs
-    //
-    // Note: The objective coefficients are set during the creation of
-    //       the decision variables above.
-    model.set(GRB_IntAttr_ModelSense, GRB_MINIMIZE);
-    // model.set()
+    
+    model.set(GRB_IntAttr_ModelSense, GRB_MAXIMIZE);
 
     // Nutrition constraints
+    //modificado para tentar deixar o primero dual inviavel no dual simplex
     for (int i = 0; i < nCategories; ++i)
     {
       GRBLinExpr ntot = 0;
@@ -80,22 +73,60 @@ int main(int argc,
       {
         ntot += nutritionValues[j][i] * buy[j];
       }
-      model.addConstr(ntot == nutrition[i], Categories[i]);
+      // model.addConstr(ntot >= minNutrition[i], Categories[i]);
+      model.addConstr(ntot <= maxNutrition[i], Categories[i]);
     }
-
+    
+    model.update(); //necessario na primeira vez para manipular as variaveis e restricoes antes de usar .optimize()
+    GRBConstr* constrs = model.getConstrs();
+    for(int i = 0; i < 9; i++)
+    {
+      if(i <= 6)
+        buy[i].set(GRB_IntAttr_VBasis, -1);
+      else
+        buy[i].set(GRB_IntAttr_VBasis, 0);
+    }
+    constrs[0].set(GRB_IntAttr_CBasis, -1);
+    constrs[1].set(GRB_IntAttr_CBasis, 0);
+    constrs[2].set(GRB_IntAttr_CBasis, 0);
+    constrs[3].set(GRB_IntAttr_CBasis, -1);
+    
     // Solve
     model.optimize();
-    printSolution(model, nCategories, nFoods, buy, nutrition);
+    std::cout << "VBasis: \n";
+    for(int i = 0; i < 9; i++)
+    {
+      std::cout << buy[i].get(GRB_IntAttr_VBasis) << std::endl;
+    }
+    std::cout << "CBasis: \n";
+    
+    for(int i = 0; i < nCategories; i++)
+    {
+      std::cout << constrs[i].get(GRB_IntAttr_CBasis) << std::endl;
+    }
+    printSolution(model, nCategories, nFoods, buy);
+
 
     cout << "\nAdding constraint: at most 6 servings of dairy" << endl;
-    // model.addConstr(buy[7] + buy[8] <= 6.0, "limit_dairy");
-    // model.addConstr(buy[7] <= 6);
-    buy[7].set(GRB_DoubleAttr_UB, 6);
-    
 
-    // Solve
+
     model.optimize();
-    printSolution(model, nCategories, nFoods, buy, nutrition);
+
+    
+    printSolution(model, nCategories, nFoods, buy);
+
+    buy[0].set(GRB_DoubleAttr_LB, 1);
+    model.optimize();
+    printSolution(model, nCategories, nFoods, buy);
+
+    // model.addConstr(buy[7] <= 5);
+    // buy[7].set(GRB_DoubleAttr_UB, 5);
+    model.optimize();
+    printSolution(model, nCategories, nFoods, buy);
+    
+    std::cout << "RESTRICOES: "  << model.get(GRB_IntAttr_NumConstrs) << std::endl;
+    //setar LB/UB da variavel nao adiciona uma nova restricao.
+    // std::cout << buy[7].get(GRB_DoubleAttr_RC) << std::endl;
 
   }
   catch (GRBException e)
@@ -115,7 +146,7 @@ int main(int argc,
 }
 
 void printSolution(GRBModel& model, int nCategories, int nFoods,
-                   GRBVar* buy, GRBVar* nutrition)
+                   GRBVar* buy)
 {
   if (model.get(GRB_IntAttr_Status) == GRB_OPTIMAL)
   {
@@ -131,12 +162,12 @@ void printSolution(GRBModel& model, int nCategories, int nFoods,
         buy[j].get(GRB_DoubleAttr_X) << endl;
       }
     }
-    cout << "\nNutrition:" << endl;
-    for (int i = 0; i < nCategories; ++i)
-    {
-      cout << nutrition[i].get(GRB_StringAttr_VarName) << " " <<
-      nutrition[i].get(GRB_DoubleAttr_X) << endl;
-    }
+    // cout << "\nNutrition:" << endl;
+    // for (int i = 0; i < nCategories; ++i)
+    // {
+    //   cout << nutrition[i].get(GRB_StringAttr_VarName) << " " <<
+    //   nutrition[i].get(GRB_DoubleAttr_X) << endl;
+    // }
   }
   else
   {
