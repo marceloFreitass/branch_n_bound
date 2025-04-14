@@ -33,7 +33,7 @@ ifeq ($(BUILD),release)
     CFLAGS_MODE = -O3 -DNDEBUG
     OBJDIR = obj/release
 else ifeq ($(BUILD),debug)
-    CFLAGS_MODE = -g -DDEBUG
+    CFLAGS_MODE = -g -D _GLIBCXX_DEBUG -D _GLIBCXX_DEBUG_PEDANTIC
     OBJDIR = obj/debug
 else
     $(error Invalid BUILD mode '$(BUILD)'. Use 'debug' or 'release')
@@ -45,7 +45,7 @@ OBJS = $(patsubst $(SRCDIR)/%.cpp, $(OBJDIR)/%.o, $(SRCS))
 #############################
 
 #### regra principal, gera o executavel
-bc: $(OBJS) 
+bb: $(OBJS) 
 	@echo  "\033[31m \nLinking all objects files: \033[0m"
 	$(CPPC) $(BITS_OPTION) $(OBJS) -o $@ $(CCLNFLAGS)
 ############################
@@ -61,7 +61,7 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.cpp | mkdirs
 #delete objetos e arquivos de dependencia
 clean:
 	@echo "\033[31mCleaning all obj directories\033[0m"
-	@rm -f bc
+	@rm -f bb
 	@rm -rf obj/debug obj/release
 
 mkdirs:
@@ -69,9 +69,9 @@ mkdirs:
 	
 rebuild: 
 	$(MAKE) clean
-	$(MAKE) bc
+	$(MAKE) bb
 debug:
-	$(MAKE) BUILD=debug bc
+	$(MAKE) BUILD=debug bb
 
 release:
-	$(MAKE) BUILD=release bc
+	$(MAKE) BUILD=release bb
