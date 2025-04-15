@@ -10,7 +10,8 @@ Data::Data(const std::string file_path)
     }
 
     file >> n >> m;
-
+    double opt;
+    file >> opt;
     c = std::vector<double>(n);
     b = std::vector<double>(m);
     A = std::vector<std::vector<double>>(m, std::vector<double>(n));
@@ -25,6 +26,9 @@ Data::Data(const std::string file_path)
         {
             file >> A[j][i];
         }
+    }
+    for(int j = 0; j < m; j++)
+    {
         file >> b[j];
     }
 }

@@ -2,6 +2,18 @@
 #include "gurobi_c++.h"
 #include "Data.h"
 #include <string>
+#include <stack>
+#include <math.h>
+
+#define EPSILON 10e-6
+
+typedef struct
+{
+    std::vector<int> zero;
+    std::vector<int> one;
+    
+}Node;
+
 class BB
 {
     public:
@@ -16,6 +28,7 @@ class BB
 
         int get_most_fractional();
         void set_bounds();
+        void print_solution();
 
         //GRBconstr* constrs TODO
 };

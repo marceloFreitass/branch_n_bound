@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
     data.print_matrix();
 
     BB solver(data, env);
-
+    solver.solve();
     
  
 }
