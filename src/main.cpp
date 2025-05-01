@@ -1,12 +1,5 @@
-/* Copyright 2025, Gurobi Optimization, LLC */
-
-/* Solve the classic diet model, showing how to add constraints
-to an existing model. */
-
 #include "Data.h"
 #include "BB.h"
-#include <ctime>
-#include <chrono>
 using namespace std;
 
 int main(int argc, char *argv[])
